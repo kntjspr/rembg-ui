@@ -47,9 +47,25 @@ def main():
         
     temp_root.destroy()
     root = TkinterDnD.Tk()
-    root.title("Background Remover")
-    # Set minimum window size
-    root.minsize(800, 600)
+    root.title("Background Remover - AI-Powered Background Removal")
+    # Set minimum window size and center the window
+    root.minsize(900, 700)
+
+    # Center the window on screen
+    root.update_idletasks()
+    width = root.winfo_width()
+    height = root.winfo_height()
+    x = (root.winfo_screenwidth() // 2) - (width // 2)
+    y = (root.winfo_screenheight() // 2) - (height // 2)
+    root.geometry(f"{width}x{height}+{x}+{y}")
+
+    # Set window icon if available (optional)
+    try:
+        # You can add an icon file here if you have one
+        # root.iconbitmap("icon.ico")
+        pass
+    except:
+        pass
     
     # Check dependencies before starting
     from utils import install_dependencies

@@ -29,21 +29,34 @@ class ScrollableImageView(ttk.Frame):
         self.image_label = ttk.Label(self.canvas)
         self.canvas.create_window((0, 0), window=self.image_label, anchor="nw")
         
-        # Zoom control
+        # Enhanced zoom control with better styling
         zoom_frame = ttk.Frame(self)
-        zoom_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=2)
-        
-        ttk.Button(zoom_frame, text="-", width=3, command=self.zoom_out).pack(side=tk.LEFT, padx=2)
+        zoom_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
+
+        # Zoom controls with improved icons and layout
+        ttk.Button(zoom_frame, text="−", width=3, command=self.zoom_out).pack(side=tk.LEFT, padx=2)
         ttk.Button(zoom_frame, text="+", width=3, command=self.zoom_in).pack(side=tk.LEFT, padx=2)
-        ttk.Button(zoom_frame, text="Fit", command=self.zoom_fit).pack(side=tk.LEFT, padx=2)
+        ttk.Button(zoom_frame, text="⊞", width=3, command=self.zoom_fit).pack(side=tk.LEFT, padx=2)
+        ttk.Button(zoom_frame, text="1:1", width=3, command=self.zoom_actual).pack(side=tk.LEFT, padx=2)
+
+        # Zoom level display
+        self.zoom_var = tk.StringVar(value="100%")
+        ttk.Label(zoom_frame, textvariable=self.zoom_var, font=('Segoe UI', 8)).pack(side=tk.LEFT, padx=(10, 2))
         
         # State
         self.photo_image = None
         self.pil_image = None
         self.zoom_factor = 1.0
         
-        # Bind events
+        # Bind events for better interaction
         self.canvas.bind("<Configure>", self.on_canvas_configure)
+        self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
+        self.canvas.bind("<Button-1>", self.on_canvas_click)
+        self.canvas.bind("<B1-Motion>", self.on_canvas_drag)
+
+        # Variables for panning
+        self.last_x = 0
+        self.last_y = 0
         
     def set_image(self, image: Image.Image):
         """Set a new image to display"""
@@ -58,22 +71,26 @@ class ScrollableImageView(ttk.Frame):
         self.image_label.configure(image=None)
         
     def update_view(self):
-        """Update the displayed image with current zoom factor"""
+        """Update the displayed image with current zoom factor and zoom level display"""
         if self.pil_image:
             # Calculate new size
             new_width = int(self.pil_image.width * self.zoom_factor)
             new_height = int(self.pil_image.height * self.zoom_factor)
-            
-            # Resize image
+
+            # Resize image with high quality
             resized = self.pil_image.resize(
                 (new_width, new_height),
                 Image.Resampling.LANCZOS
             )
-            
+
             # Update photo image
             self.photo_image = ImageTk.PhotoImage(resized)
             self.image_label.configure(image=self.photo_image)
-            
+
+            # Update zoom level display
+            zoom_percent = int(self.zoom_factor * 100)
+            self.zoom_var.set(f"{zoom_percent}%")
+
             # Update canvas scroll region
             self.canvas.configure(scrollregion=self.canvas.bbox("all"))
             
@@ -95,15 +112,53 @@ class ScrollableImageView(ttk.Frame):
             # Get canvas size
             canvas_width = self.canvas.winfo_width()
             canvas_height = self.canvas.winfo_height()
-            
-            # Calculate zoom factors for width and height
-            width_factor = canvas_width / self.pil_image.width
-            height_factor = canvas_height / self.pil_image.height
-            
-            # Use smallest factor to fit image in both dimensions
-            self.zoom_factor = min(width_factor, height_factor) * 0.9
+
+            if canvas_width > 1 and canvas_height > 1:  # Ensure canvas is properly sized
+                # Calculate zoom factors for width and height
+                width_factor = canvas_width / self.pil_image.width
+                height_factor = canvas_height / self.pil_image.height
+
+                # Use smallest factor to fit image in both dimensions
+                self.zoom_factor = min(width_factor, height_factor) * 0.9
+                self.update_view()
+
+    def zoom_actual(self):
+        """Reset zoom to actual size (100%)"""
+        if self.pil_image:
+            self.zoom_factor = 1.0
             self.update_view()
-            
+
+    def on_mouse_wheel(self, event):
+        """Handle mouse wheel for zooming"""
+        if self.pil_image:
+            # Zoom in/out based on wheel direction
+            if event.delta > 0:
+                self.zoom_factor *= 1.1
+            else:
+                self.zoom_factor *= 0.9
+
+            # Limit zoom range
+            self.zoom_factor = max(0.1, min(self.zoom_factor, 10.0))
+            self.update_view()
+
+    def on_canvas_click(self, event):
+        """Handle canvas click for panning start"""
+        self.last_x = event.x
+        self.last_y = event.y
+
+    def on_canvas_drag(self, event):
+        """Handle canvas drag for panning"""
+        # Calculate movement
+        dx = event.x - self.last_x
+        dy = event.y - self.last_y
+
+        # Scroll the canvas
+        self.canvas.scan_dragto(event.x, event.y, gain=1)
+
+        # Update last position
+        self.last_x = event.x
+        self.last_y = event.y
+
     def on_canvas_configure(self, event):
         """Handle canvas resize"""
         if self.pil_image:
